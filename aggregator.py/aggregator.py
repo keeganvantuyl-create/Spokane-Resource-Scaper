@@ -8,21 +8,31 @@ all_matches = []
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
 sites_to_scrape = [
-    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/"},
-    {"name": "Spokane Public Library", "url": "https://www.spokanelibrary.org/digital/"},
-    {"name": "City of Spokane Jobs", "url": "https://my.spokanecity.org/jobs/"},
-    {"name": "Spokane County Resources", "url": "https://www.spokanecounty.gov/543/Community-Resources"},
-    {"name": "Catholic Charities Spokane", "url": "https://www.cceasternwa.org/all-services"},
-    {"name": "Spokane 211", "url": "https://wa211.org/"}
+    # HOUSING
+    {"name": "Spokane Housing Authority", "url": "https://www.spokanehousing.org/"},
+    {"name": "SNAP Spokane (Housing)", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/"},
+    
+    # JOBS & REENTRY
+    {"name": "Pioneer Human Services", "url": "https://pioneerhumanservices.org/career-services/guiding-reentry-opportunities-for-workforce-development/"},
+    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/"},
+    {"name": "Revive Center", "url": "https://rc4rc.org/"},
+    
+    # GRANTS & COLLEGE
+    {"name": "SCC Workforce Transitions", "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs"},
+    {"name": "CCS Foundation Scholarships", "url": "https://ccsfoundation.org/Apply-for-Scholarships"},
+    {"name": "National Reentry Resource Center", "url": "https://nationalreentryresourcecenter.org/"},
+    
+    # TRANSPORTATION
+    {"name": "STA Opportunity (Bus Pass)", "url": "https://www.spokanetransit.com/opportunity/"}
 ]
 
-search_term = input("Enter search term (try 'housing', 'jobs', or 'help'): ").lower()
+search_term = input("Enter search (e.g., 'grant', 'jobs', 'bus', 'housing'): ").lower()
 
 # --- STEP 2: Scrape ---
 for site in sites_to_scrape:
     try:
         print(f"Checking {site['name']}...")
-        time.sleep(1.5) # Wait a beat so we don't get blocked
+        time.sleep(1) # Be polite to the servers
         
         response = requests.get(site['url'], headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -32,7 +42,6 @@ for site in sites_to_scrape:
             link = item.get('href')
 
             if name and link and "http" in link:
-                # This checks if your word is in the link text or the link itself
                 if search_term in name.lower() or search_term in link.lower():
                     all_matches.append({"site": site['name'], "name": name, "link": link})
 
@@ -54,4 +63,4 @@ with open("resources.txt", "w") as file:
                 print(output)
                 file.write(output + "\n")
 
-print(f"\nDone! Found {len(seen_links)} resources. Check 'resources.txt' for the list.")
+print(f"\nDone! Found {len(seen_links)} resources. Saved to 'resources.txt'.")
