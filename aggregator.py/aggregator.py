@@ -7,8 +7,13 @@ all_matches = []
 
 # Added a couple of real Spokane links as examples
 sites_to_scrape = [
+    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/"},
+    {"name": "Spokane Public Library", "url": "https://www.spokanelibrary.org/digital/"},
+    {"name": "City of Spokane Jobs", "url": "https://my.spokanecity.org/jobs/"},
+    {"name": "Spokane County Resources", "url": "https://www.spokanecounty.gov/543/Community-Resources"},
+    {"name": "Catholic Charities Spokane", "url": "https://www.cceasternwa.org/all-services"},
     {"name": "Spokane 211", "url": "https://wa211.org/"},
-    {"name": "City of Spokane", "url": "https://my.spokanecity.org/"},
+    {"name": "City of Spokane Home", "url": "https://my.spokanecity.org/"}
 ]
 
 search_term = input("Enter search term (e.g., 'reentry' or 'housing'): ")
