@@ -49,8 +49,12 @@ for site in sites_to_scrape:
         print(f"Skipping {site['name']} (Connection issue)")
 
 # --- STEP 3: Display & Save ---
-with open("resources.txt", "w") as file:
-    file.write(f"--- RESOURCES FOUND FOR: {search_term.upper()} ---\n\n")
+# Changed "w" to "a" so it appends to the file instead of overwriting it
+with open("resources.txt", "a") as file:
+    # Adding a timestamp and search term header
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    file.write(f"\n--- SEARCH: {search_term.upper()} | DATE: {timestamp} ---\n\n")
+    
     if not all_matches:
         print(f"\nNo matches found for '{search_term}'.")
     else:
@@ -63,4 +67,4 @@ with open("resources.txt", "w") as file:
                 print(output)
                 file.write(output + "\n")
 
-print(f"\nDone! Found {len(seen_links)} resources. Saved to 'resources.txt'.")
+print(f"\nDone! Found {len(seen_links)} resources. Added to 'resources.txt'.")
