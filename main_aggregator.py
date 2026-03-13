@@ -4,7 +4,7 @@ import time
 import csv
 from datetime import datetime
 
-# --- Setup & Spokane Data Sources ---
+# --- STEP 1: Setup & Spokane Data Sources ---
 today = datetime.now()
 seen_links = set()
 all_matches = []
@@ -24,7 +24,7 @@ sites_to_scrape = [
 print(f"--- Spokane Resource Aggregator | {today.strftime('%B %d, %Y')} ---")
 search_term = input("Enter search (e.g., 'grant', 'jobs', 'recovery'): ").lower()
 
-# --- Live Web Scraping ---
+# --- STEP 2: Live Web Scraping ---
 for site in sites_to_scrape:
     try:
         print(f"Checking {site['name']}...")
@@ -47,7 +47,7 @@ for site in sites_to_scrape:
     except Exception as e:
         print(f"Skipping {site['name']} (Error: {e})")
 
-# --- Priority Logic & Export ---
+# --- STEP 3: Priority Logic & Export ---
 if not all_matches:
     print(f"\nNo matches found for '{search_term}'.")
 else:
