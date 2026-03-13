@@ -1,30 +1,22 @@
-# 🌲 Spokane Resource Scraper
+# Spokane Reentry Resource Aggregator
+**Empowering formerly incarcerated individuals through automated resource discovery.**
 
-A Python-based web scraper designed to help students and community members in Spokane, WA, find local grants, housing, and career resources in real-time.
+## 🎯 The Mission
+The first 72 hours after release are critical. This tool is designed to bridge the gap between incarceration and stability by aggregating real-time resources in Spokane, WA, specifically targeting:
+* **Housing:** Low-barrier and transitional housing.
+* **Employment:** Reentry-friendly employers and workforce training (Pioneer, WorkSource).
+* **Recovery:** Instant access to local support groups (NA/AA) with fallback logic for high-reliability.
+* **Transportation:** Accessible bus pass programs.
 
-## 🚀 Overview
-I built this tool to automate the search for critical community resources. It currently targets high-impact local organizations and provides a "Priority" alert system for urgent deadlines.
+## 🛠️ How it Works
+This Python-based tool uses **BeautifulSoup** and **Requests** to scrape local government and non-profit websites. It features:
+* **Graceful Degradation:** Hardcoded fallback resources for essential services when external sites are unreachable.
+* **Priority Logic:** Automatically flags resources with upcoming deadlines as "URGENT."
+* **CSV Export:** Generates a portable list that case managers and individuals can use offline.
 
-**Targeted Resources:**
-* **SCC Workforce Transitions** (Opportunity Grants, FAFSA/WASFA)
-* **WorkSource Spokane** (Job opportunities & training)
-* **SNAP Spokane** (Housing & rental assistance)
-* **Pioneer Human Services** (Career reentry)
+## 🚀 Future Roadmap
+* **API Integration:** Transitioning from scraping to official APIs (CareerOneStop) for deeper job data.
+* **SMS Alerts:** Notifying users of new grant or housing openings.
+* **Mapping:** Visualizing resources near Spokane transit centers.
 
-## ✨ Key Features
-* **Live Web Scraping:** Uses `BeautifulSoup` to pull direct links from official Spokane agency websites.
-* **Priority Alerts:** Automatically flags resources with upcoming deadlines as **[URGENT]**.
-* **CSV Export:** Saves all findings to a `spokane_resources.csv` file for easy tracking in Excel.
-* **Polite Scraping:** Implements `time.sleep` to ensure respectful interaction with local servers.
-
-## 🛠️ Tech Stack
-* **Language:** Python 3.12+
-* **Libraries:** `requests`, `beautifulsoup4`, `csv`
-* **Environment:** PyCharm Professional
-
-## 📥 Installation & Usage
-To run this project locally on your machine:
-
-1. **Clone the repo:**
-   ```bash
-   git clone [https://github.com/KeeganVT/Spokane-Resource-Scraper.git](https://github.com/KeeganVT/Spokane-Resource-Scraper.git)
+*Built by Keegan Van Tuyl - Software Development Student at SCC.*
