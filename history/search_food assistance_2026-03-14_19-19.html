@@ -1,0 +1,19 @@
+<html><head><style>
+            body { font-family: sans-serif; background: #f4f7f6; padding: 20px; }
+            table { width: 100%; background: white; border-collapse: collapse; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+            th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+            th { background: #2c3e50; color: white; }
+            .URGENT { color: red; font-weight: bold; border-left: 4px solid red; }
+            .NEW { background: #28a745; color: white; padding: 2px 5px; border-radius: 3px; font-size: 10px; }
+            .btn { background: #3498db; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        </style></head><body>
+        <h2>Results: FOOD ASSISTANCE</h2>
+        <div style="margin-bottom:10px">2026-03-14 07:19 PM | Found 2 items</div>
+        <table><thead><tr><th>Action</th><th>Priority</th><th>Resource</th><th>Deadline</th><th>Contact</th></tr></thead><tbody><tr><td><button class='btn' onclick='save("Housing & Food Assistance","https://www.arc-spokane.org/resources/housing")'>Save</button> </td><td class='NORMAL'>NORMAL</td><td><a href='https://www.arc-spokane.org/resources/housing' target='_blank'><b>Housing & Food Assistance</b></a> <span class="NEW">NEW</span><br><small>The Arc of Spokane</small></td><td>Check Site</td><td><a href='tel:509-328-6326'>📞 509-328-6326</a><br><a href='https://www.google.com/maps/search/The%20Arc%20of%20Spokane%20320%20E%202nd%20Ave%2C%2099202' target='_blank' style='font-size:11px;color:#3498db'>📍 Directions</a></td></tr><tr><td><button class='btn' onclick='save("Housing & Food Assistance","https://www.arc-spokane.org/resources/housing")'>Save</button> </td><td class='NORMAL'>NORMAL</td><td><a href='https://www.arc-spokane.org/resources/housing' target='_blank'><b>Housing & Food Assistance</b></a> <span class="NEW">NEW</span><br><small>The Arc of Spokane</small></td><td>Check Site</td><td><a href='tel:509-328-6326'>📞 509-328-6326</a><br><a href='https://www.google.com/maps/search/The%20Arc%20of%20Spokane%20320%20E%202nd%20Ave%2C%2099202' target='_blank' style='font-size:11px;color:#3498db'>📍 Directions</a></td></tr></tbody></table><script>
+        function save(n,l){let s=JSON.parse(localStorage.getItem('s')||'[]');if(!s.find(i=>i.l===l)){s.push({n,l});localStorage.setItem('s',JSON.stringify(s));alert('Saved!');}}
+        function cal(n,d){
+            let ics = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:"+d+"T090000\nSUMMARY:Deadline: "+n+"\nEND:VEVENT\nEND:VCALENDAR";
+            let blob = new Blob([ics], {type: 'text/calendar'});
+            let a = document.createElement('a'); a.download = 'reminder.ics'; a.href = window.URL.createObjectURL(blob); a.click();
+        }
+        </script></body></html>
