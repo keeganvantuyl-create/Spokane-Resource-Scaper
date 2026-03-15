@@ -7,6 +7,7 @@ import sys
 import subprocess
 import webbrowser
 import winsound
+import multiprocessing  # Required to stop the infinite window glitch
 from datetime import datetime
 from urllib.parse import urljoin, quote
 from playwright.async_api import async_playwright
@@ -19,6 +20,7 @@ HTML_FILE = "dashboard.html"
 
 # Curated Spokane Resource List
 SITES = [
+    {"name": "HSSA Spokane", "url": "https://hssaspokane.org/"},
     {"name": "Spokane Housing Authority", "url": "https://www.spokanehousing.org/"},
     {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/"},
     {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/"},
@@ -30,7 +32,6 @@ SITES = [
     {"name": "Goodwill Industries NW",
      "url": "https://www.discovergoodwill.org/supportive-services-for-veteran-families/"},
     {"name": "Career Path Services", "url": "https://www.careerpathservices.org/"},
-    {"name": "Union Gospel Mission", "url": "https://www.uniongospelmission.org/recovery"},
     {"name": "The Arc of Spokane", "url": "https://www.arc-spokane.org/supported-employment"},
     {"name": "Next Generation Zone", "url": "https://nextgenzone.org/"}
 ]
@@ -43,6 +44,7 @@ FIELD_MAP = {
 
 
 def ensure_browser():
+    """Ensures Chromium is installed for Playwright."""
     try:
         subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
     except:
@@ -155,14 +157,13 @@ class ResourceHubPro(ctk.CTk):
             if self.web_search_var.get():
                 self.after(0, lambda: self.progress_label.configure(text="Deep Scanning Web..."))
                 try:
-                    with DDGS() as ddgs:
-                        web_res = ddgs.text(f"{query} Spokane WA", max_results=15)
-                        for r in web_res:
-                            if r['href'] not in seen_urls:
-                                seen_urls.add(r['href'])
-                                res = {"n": r['title'], "s": "Web Search", "l": r['href']}
-                                all_results.append(res)
-                                self.after(0, lambda r=res: self.add_result_card(r['s'], r['n'], r['l']))
+                    results = DDGS().text(f"{query} Spokane WA", max_results=15)
+                    for r in results:
+                        if r['href'] not in seen_urls:
+                            seen_urls.add(r['href'])
+                            res = {"n": r['title'], "s": "Web Search", "l": r['href']}
+                            all_results.append(res)
+                            self.after(0, lambda r=res: self.add_result_card(r['s'], r['n'], r['l']))
                 except:
                     pass
 
@@ -183,7 +184,7 @@ class ResourceHubPro(ctk.CTk):
             .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }}
             .card {{ background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 5px solid #3498db; }}
             .btn {{ color: #3498db; text-decoration: none; font-weight: bold; }}
-        </style></head><body><h1>Spokane {datetime.now().year} Results</h1><div class='grid'>{cards}</div></body></html>"""
+        </style></head><body><h1>Spokane Resource Hub Results</h1><div class='grid'>{cards}</div></body></html>"""
 
         with open(HTML_FILE, "w", encoding="utf-8") as f: f.write(template)
 
@@ -231,6 +232,8 @@ class ResourceHubPro(ctk.CTk):
 
 
 if __name__ == "__main__":
+    # CRITICAL: This line stops the infinite window loop when running as an EXE
+    multiprocessing.freeze_support()
     ensure_browser()
-    app = ResourceHubPro();
+    app = ResourceHubPro()
     app.mainloop()
