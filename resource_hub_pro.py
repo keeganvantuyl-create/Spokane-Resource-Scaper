@@ -4,236 +4,152 @@ import threading
 import json
 import os
 import sys
-import subprocess
+import re
 import webbrowser
 import winsound
-import multiprocessing  # Required to stop the infinite window glitch
+import multiprocessing
 from datetime import datetime
-from urllib.parse import urljoin, quote
 from playwright.async_api import async_playwright
-from duckduckgo_search import DDGS
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+from urllib.parse import quote
 
 # --- CONFIGURATION ---
+VERSION = "v2.4-GreenDot"
 SETTINGS_FILE = "user_settings.json"
-HTML_FILE = "dashboard.html"
-
-# Curated Spokane Resource List
-SITES = [
-    {"name": "HSSA Spokane", "url": "https://hssaspokane.org/"},
-    {"name": "Spokane Housing Authority", "url": "https://www.spokanehousing.org/"},
-    {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/"},
-    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/"},
-    {"name": "SCC Workforce Transitions",
-     "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs"},
-    {"name": "Catholic Charities EWA", "url": "https://www.cceasternwa.org/housing"},
-    {"name": "City of Spokane CHHS", "url": "https://my.spokanecity.org/chhs/resources/"},
-    {"name": "Pioneer Human Services", "url": "https://pioneerhumanservices.org/training/"},
-    {"name": "Goodwill Industries NW",
-     "url": "https://www.discovergoodwill.org/supportive-services-for-veteran-families/"},
-    {"name": "Career Path Services", "url": "https://www.careerpathservices.org/"},
-    {"name": "The Arc of Spokane", "url": "https://www.arc-spokane.org/supported-employment"},
-    {"name": "Next Generation Zone", "url": "https://nextgenzone.org/"}
-]
-
-FIELD_MAP = {
-    "first_name": ["first", "fname", "given-name", "name"],
-    "email": ["email", "mail", "user_email"],
-    "resume": ["resume", "cv", "upload", "attachment", "file"]
-}
 
 
-def ensure_browser():
-    """Ensures Chromium is installed for Playwright."""
+def resource_path(relative_path):
     try:
-        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
-    except:
-        pass
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
+SITES = [
+    {"name": "SCC Workforce",
+     "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs",
+     "addr": "1810 N Greene St, Spokane, WA 99217"},
+    {"name": "Spokane Housing", "url": "https://www.spokanehousing.org/", "addr": "25 W Nora Ave, Spokane, WA 99205"},
+    {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/",
+     "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
+    {"name": "WorkSource", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/",
+     "addr": "130 S Arthur St, Spokane, WA 99202"},
+    {"name": "Catholic Charities", "url": "https://www.cceasternwa.org/housing",
+     "addr": "12 E 5th Ave, Spokane, WA 99202"},
+    {"name": "City of Spokane", "url": "https://my.spokanecity.org/chhs/resources/",
+     "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
+    {"name": "HSSA Spokane", "url": "https://hssaspokane.org/", "addr": "120 N Stevens St, Spokane, WA 99201"}
+]
 
 
 class ResourceHubPro(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Spokane Resource Hub Pro - Keegan Van Tuyl")
-        self.geometry("950x850")
+        self.title(f"Spokane Resource Hub Pro - {VERSION}")
+        self.geometry("1150x850")
         ctk.set_appearance_mode("dark")
+        self.results_count = 0
 
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(padx=10, pady=10, fill="both", expand=True)
-        self.tabview.add("Search & Aggregate")
-        self.tabview.add("Auto-Fill Tool")
+        self.tabview.add("Resource Board");
         self.tabview.add("Settings")
 
-        self.setup_search_tab()
-        self.setup_autofill_tab()
+        self.setup_board_tab()
         self.setup_settings_tab()
-        self.load_settings()
 
-    def setup_search_tab(self):
-        tab = self.tabview.tab("Search & Aggregate")
-        self.query_entry = ctk.CTkEntry(tab, placeholder_text="Search (job/grant/housing)...", width=450)
-        self.query_entry.pack(pady=10)
+    def setup_board_tab(self):
+        tab = self.tabview.tab("Resource Board")
+        head_f = ctk.CTkFrame(tab, fg_color="transparent")
+        head_f.pack(fill="x", pady=10)
 
-        self.web_search_var = ctk.BooleanVar(value=False)
-        self.web_switch = ctk.CTkSwitch(tab, text="Include Live Web Search", variable=self.web_search_var)
-        self.web_switch.pack(pady=5)
+        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (e.g. Grant, Housing, Job)...", width=450)
+        self.query_entry.pack(side="left", padx=10)
 
-        self.progress_label = ctk.CTkLabel(tab, text="Ready to Scan")
-        self.progress_label.pack(pady=(10, 0))
-        self.progress_bar = ctk.CTkProgressBar(tab, width=500)
-        self.progress_bar.set(0)
-        self.progress_bar.pack(pady=(0, 10))
+        ctk.CTkButton(head_f, text="Launch Deep Scan", fg_color="#2ecc71", command=self.run_aggregator).pack(
+            side="left", padx=5)
 
-        self.search_btn = ctk.CTkButton(tab, text="Launch Deep Scan", fg_color="#2ecc71", command=self.run_aggregator)
-        self.search_btn.pack(pady=10)
+        # Found Count Label
+        self.count_label = ctk.CTkLabel(head_f, text="Found: 0", font=("Arial", 14, "bold"), text_color="#2ecc71")
+        self.count_label.pack(side="right", padx=20)
 
-        self.results_frame = ctk.CTkScrollableFrame(tab, width=850, height=450, label_text="Scraper Results")
-        self.results_frame.pack(pady=10, fill="both", expand=True)
+        self.progress_bar = ctk.CTkProgressBar(tab, width=900);
+        self.progress_bar.set(0);
+        self.progress_bar.pack(pady=5)
+        self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
+        self.results_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-    def setup_autofill_tab(self):
-        tab = self.tabview.tab("Auto-Fill Tool")
-        self.url_entry = ctk.CTkEntry(tab, placeholder_text="Target URL", width=600)
-        self.url_entry.pack(pady=20)
-        self.fill_btn = ctk.CTkButton(tab, text="Apply Now (Auto-Fill)", command=self.start_autofill,
-                                      fg_color="#3498db")
-        self.fill_btn.pack(pady=10)
-        self.log_box = ctk.CTkTextbox(tab, width=800, height=400, fg_color="#1a1a1a")
-        self.log_box.pack(pady=10)
+    def add_result_row(self, site, query, phone, priority):
+        self.results_count += 1
+        self.count_label.configure(text=f"Found: {self.results_count}")
 
-    def setup_settings_tab(self):
-        tab = self.tabview.tab("Settings")
-        ctk.CTkLabel(tab, text="User Profile Settings", font=("Arial", 16, "bold")).pack(pady=20)
-        self.name_entry = ctk.CTkEntry(tab, placeholder_text="Full Name", width=400)
-        self.name_entry.pack(pady=10)
-        self.email_entry = ctk.CTkEntry(tab, placeholder_text="Email Address", width=400)
-        self.email_entry.pack(pady=10)
+        p_color = "#e74c3c" if priority == "URGENT" else "#3498db"
+        row = ctk.CTkFrame(self.results_frame, fg_color="#242424", height=60)
+        row.pack(fill="x", pady=3, padx=5)
 
-        res_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        res_frame.pack(pady=10)
-        self.res_path = ctk.CTkEntry(res_frame, placeholder_text="Resume Path", width=300)
-        self.res_path.pack(side="left", padx=5)
-        ctk.CTkButton(res_frame, text="Browse", width=80, command=self.browse_file).pack(side="left")
-        ctk.CTkButton(tab, text="Save Settings", command=self.save_settings, fg_color="#2ecc71").pack(pady=40)
+        ctk.CTkLabel(row, text=priority, text_color=p_color, font=("Arial", 11, "bold"), width=100).pack(side="left")
+        ctk.CTkLabel(row, text=f"{query.upper()} OPPORTUNITY\n{site['name']}", justify="left", anchor="w",
+                     width=400).pack(side="left", padx=20)
+        ctk.CTkLabel(row, text=phone, width=150).pack(side="left")
 
-    def add_result_card(self, site, title, url):
-        card = ctk.CTkFrame(self.results_frame)
-        card.pack(pady=5, padx=10, fill="x")
-        ctk.CTkLabel(card, text=f"Source: {site}\nTitle: {title[:70]}", justify="left").pack(side="left", padx=15,
-                                                                                             pady=10)
-        ctk.CTkButton(card, text="Apply", width=100, command=lambda u=url: self.transfer_url(u)).pack(side="right",
-                                                                                                      padx=15)
-
-    def transfer_url(self, url):
-        self.url_entry.delete(0, "end");
-        self.url_entry.insert(0, url)
-        self.tabview.set("Auto-Fill Tool")
+        btn_f = ctk.CTkFrame(row, fg_color="transparent")
+        btn_f.pack(side="right", padx=10)
+        maps_url = f"https://www.google.com/maps/dir/?api=1&destination={quote(site['addr'])}"
+        ctk.CTkButton(btn_f, text="Directions", width=80, fg_color="#444",
+                      command=lambda: webbrowser.open(maps_url)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_f, text="Apply", width=80, fg_color="#3498db",
+                      command=lambda: webbrowser.open(site['url'])).pack(side="left", padx=2)
 
     async def scrape_logic(self, query):
-        all_results = [];
-        seen_urls = set()
-        for widget in self.results_frame.winfo_children(): widget.destroy()
+        if not query: return
+        self.results_count = 0
+        self.count_label.configure(text="Found: 0")
+        for w in self.results_frame.winfo_children(): w.destroy()
 
-        self.progress_bar.set(0)
-        total_steps = len(SITES) + (1 if self.web_search_var.get() else 0)
+        exec_path = None
+        if getattr(sys, 'frozen', False):
+            base = resource_path(os.path.join("playwright", "driver", "package", ".local-browsers"))
+            if os.path.exists(base):
+                for f in os.listdir(base):
+                    if f.startswith("chromium-"):
+                        exec_path = os.path.join(base, f, "chrome-win", "chrome.exe")
+                        break
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            browser = await p.chromium.launch(headless=True, executable_path=exec_path)
+            context = await browser.new_context()
 
-            for i, site in enumerate(SITES):
+            async def process_site(site):
                 try:
-                    self.after(0, lambda s=site['name']: self.progress_label.configure(text=f"Scanning: {s}"))
-                    await page.goto(site['url'], timeout=12000)
-                    if query.lower() in (await page.content()).lower():
-                        if site['url'] not in seen_urls:
-                            seen_urls.add(site['url'])
-                            res = {"n": "General Resource/Job", "s": site['name'], "l": site['url']}
-                            all_results.append(res)
-                            self.after(0, lambda r=res: self.add_result_card(r['s'], r['n'], r['l']))
-                except:
-                    pass
-                self.after(0, lambda v=(i + 1) / total_steps: self.progress_bar.set(v))
-
-            if self.web_search_var.get():
-                self.after(0, lambda: self.progress_label.configure(text="Deep Scanning Web..."))
-                try:
-                    results = DDGS().text(f"{query} Spokane WA", max_results=15)
-                    for r in results:
-                        if r['href'] not in seen_urls:
-                            seen_urls.add(r['href'])
-                            res = {"n": r['title'], "s": "Web Search", "l": r['href']}
-                            all_results.append(res)
-                            self.after(0, lambda r=res: self.add_result_card(r['s'], r['n'], r['l']))
+                    page = await context.new_page()
+                    await page.goto(site['url'], timeout=30000, wait_until="networkidle")
+                    content = await page.content()
+                    if query.lower() in content.lower():
+                        phone = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', content)
+                        phone_str = phone.group(0) if phone else "See Site"
+                        priority = "URGENT" if any(
+                            x in content.lower() for x in ["grant", "deadline", "emergency"]) else "NORMAL"
+                        self.after(0, lambda: self.add_result_row(site, query, phone_str, priority))
+                    await page.close()
                 except:
                     pass
 
+            await asyncio.gather(*[process_site(s) for s in SITES])
             await browser.close()
             self.after(0, lambda: self.progress_bar.set(1.0))
-            self.after(0, lambda: self.progress_label.configure(text="Scan Complete!"))
-            self.generate_html(all_results)
-            winsound.MessageBeep(winsound.MB_ICONASTERISK)
-            webbrowser.open(HTML_FILE)
-
-    def generate_html(self, results):
-        cards = ""
-        for r in results:
-            cards += f"<div class='card'><h3>{r['n']}</h3><p>{r['s']}</p><a href='{r['l']}' class='btn' target='_blank'>Apply</a></div>"
-
-        template = f"""<html><head><style>
-            body {{ background: #121212; color: #eee; font-family: sans-serif; padding: 40px; }}
-            .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }}
-            .card {{ background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 5px solid #3498db; }}
-            .btn {{ color: #3498db; text-decoration: none; font-weight: bold; }}
-        </style></head><body><h1>Spokane Resource Hub Results</h1><div class='grid'>{cards}</div></body></html>"""
-
-        with open(HTML_FILE, "w", encoding="utf-8") as f: f.write(template)
-
-    def log(self, msg):
-        self.log_box.insert("end", f"> {msg}\n");
-        self.log_box.see("end")
-
-    async def autofill_logic(self, url):
-        with open(SETTINGS_FILE, "r") as f:
-            user = json.load(f)
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False)
-            page = await browser.new_page()
-            await page.goto(url)
-            inputs = await page.query_selector_all('input')
-            for btn in inputs:
-                n = (await btn.get_attribute('name') or "").lower()
-                if any(k in n for k in FIELD_MAP["first_name"]): await btn.fill(user["name"])
-                if (await btn.get_attribute('type')) == "file": await btn.set_input_files(user["resume"])
-            self.log("Fields auto-filled. Please review.")
-            await asyncio.sleep(60)
+            winsound.MessageBeep()
 
     def run_aggregator(self):
         threading.Thread(target=lambda: asyncio.run(self.scrape_logic(self.query_entry.get())), daemon=True).start()
 
-    def start_autofill(self):
-        threading.Thread(target=lambda: asyncio.run(self.autofill_logic(self.url_entry.get())), daemon=True).start()
-
-    def browse_file(self):
-        p = filedialog.askopenfilename()
-        if p: self.res_path.delete(0, "end"); self.res_path.insert(0, p)
-
-    def save_settings(self):
-        with open(SETTINGS_FILE, "w") as f: json.dump(
-            {"name": self.name_entry.get(), "email": self.email_entry.get(), "resume": self.res_path.get()}, f)
-        self.log("Profile saved.")
-
-    def load_settings(self):
-        if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, "r") as f:
-                d = json.load(f);
-                self.name_entry.insert(0, d.get("name", ""));
-                self.email_entry.insert(0, d.get("email", ""));
-                self.res_path.insert(0, d.get("resume", ""))
+    def setup_settings_tab(self):
+        tab = self.tabview.tab("Settings")
+        ctk.CTkLabel(tab, text=f"Spokane Scraper {VERSION}").pack(pady=20)
 
 
 if __name__ == "__main__":
-    # CRITICAL: This line stops the infinite window loop when running as an EXE
     multiprocessing.freeze_support()
-    ensure_browser()
-    app = ResourceHubPro()
+    if getattr(sys, 'frozen', False): multiprocessing.set_start_method('spawn', force=True)
+    app = ResourceHubPro();
     app.mainloop()
