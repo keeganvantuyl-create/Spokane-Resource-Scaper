@@ -14,8 +14,16 @@ from tkinter import filedialog, messagebox
 from urllib.parse import quote
 
 # --- CONFIGURATION ---
-VERSION = "v2.4-GreenDot"
+VERSION = "v2.5-GreenDot"  # Updated version
 SETTINGS_FILE = "user_settings.json"
+
+# --- NEW: PRIORITY COLOR MAPPING ---
+# This replaces messy if/else statements with a clean list
+PRIORITY_COLORS = {
+    "URGENT": "#e74c3c",  # Red
+    "NORMAL": "#3498db",  # Blue
+    "LOW": "#95a5a6"  # Gray
+}
 
 
 def resource_path(relative_path):
@@ -53,7 +61,7 @@ class ResourceHubPro(ctk.CTk):
 
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(padx=10, pady=10, fill="both", expand=True)
-        self.tabview.add("Resource Board");
+        self.tabview.add("Resource Board")
         self.tabview.add("Settings")
 
         self.setup_board_tab()
@@ -70,12 +78,11 @@ class ResourceHubPro(ctk.CTk):
         ctk.CTkButton(head_f, text="Launch Deep Scan", fg_color="#2ecc71", command=self.run_aggregator).pack(
             side="left", padx=5)
 
-        # Found Count Label
         self.count_label = ctk.CTkLabel(head_f, text="Found: 0", font=("Arial", 14, "bold"), text_color="#2ecc71")
         self.count_label.pack(side="right", padx=20)
 
-        self.progress_bar = ctk.CTkProgressBar(tab, width=900);
-        self.progress_bar.set(0);
+        self.progress_bar = ctk.CTkProgressBar(tab, width=900)
+        self.progress_bar.set(0)
         self.progress_bar.pack(pady=5)
         self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
         self.results_frame.pack(fill="both", expand=True, padx=10, pady=5)
@@ -84,7 +91,9 @@ class ResourceHubPro(ctk.CTk):
         self.results_count += 1
         self.count_label.configure(text=f"Found: {self.results_count}")
 
-        p_color = "#e74c3c" if priority == "URGENT" else "#3498db"
+        # NEW: Look up the color based on the priority name
+        p_color = PRIORITY_COLORS.get(priority, "#808080")
+
         row = ctk.CTkFrame(self.results_frame, fg_color="#242424", height=60)
         row.pack(fill="x", pady=3, padx=5)
 
@@ -95,7 +104,7 @@ class ResourceHubPro(ctk.CTk):
 
         btn_f = ctk.CTkFrame(row, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
-        maps_url = f"https://www.google.com/maps/dir/?api=1&destination={quote(site['addr'])}"
+        maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}"
         ctk.CTkButton(btn_f, text="Directions", width=80, fg_color="#444",
                       command=lambda: webbrowser.open(maps_url)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Apply", width=80, fg_color="#3498db",
@@ -128,8 +137,11 @@ class ResourceHubPro(ctk.CTk):
                     if query.lower() in content.lower():
                         phone = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', content)
                         phone_str = phone.group(0) if phone else "See Site"
+
+                        # Set priority string
                         priority = "URGENT" if any(
                             x in content.lower() for x in ["grant", "deadline", "emergency"]) else "NORMAL"
+
                         self.after(0, lambda: self.add_result_row(site, query, phone_str, priority))
                     await page.close()
                 except:
@@ -151,5 +163,5 @@ class ResourceHubPro(ctk.CTk):
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     if getattr(sys, 'frozen', False): multiprocessing.set_start_method('spawn', force=True)
-    app = ResourceHubPro();
+    app = ResourceHubPro()
     app.mainloop()
