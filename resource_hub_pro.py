@@ -52,9 +52,12 @@ SITES = [
     {"name": "HSSA Spokane", "url": "https://hssaspokane.org/", "addr": "120 N Stevens St, Spokane, WA 99201"},
     {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
     {"name": "LinkedIn - Spokane", "url": "https://www.linkedin.com/jobs/search/?location=Spokane%2C%20Washington",
-     "addr": "Remote/Various"}
+     "addr": "Remote/Various"},
+    {"name":  "Local Resource Hubs", "url": "https://www.localresourcehubs.com/", "addr": "Remote/Various"},
+    {"name": "Job Search", "url": "https://www.jobsearch.com/", "addr": "Remote/Various"},
+    {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
+    {"name": "ENV LLC", "URL": 'https://www.envllc.com/careers/job-opportunities/', "addr": "Remote/Various"},
 ]
-
 
 class ResourceHubPro(ctk.CTk):
     def __init__(self):
