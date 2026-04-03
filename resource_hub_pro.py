@@ -84,8 +84,10 @@ class ResourceHubPro(ctk.CTk):
         head_f = ctk.CTkFrame(tab, fg_color="transparent")
         head_f.pack(fill="x", pady=10)
 
+        # ENTRY: Added .bind("<Return>") to trigger search via Enter key
         self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (e.g. Python, Grant, Housing)...", width=450)
         self.query_entry.pack(side="left", padx=10)
+        self.query_entry.bind("<Return>", lambda event: self.run_aggregator())
 
         ctk.CTkButton(head_f, text="Launch Deep Scan", fg_color="#2ecc71", hover_color="#27ae60",
                       command=self.run_aggregator).pack(side="left", padx=5)
@@ -99,7 +101,7 @@ class ResourceHubPro(ctk.CTk):
         self.progress_bar.set(0)
         self.progress_bar.pack(pady=5)
 
-        # SPINNER: Indeterminate progress bar to show active thread work
+        # SPINNER: Indeterminate bar to show activity during browser launch
         self.spinner = ctk.CTkProgressBar(tab, width=400, mode="indeterminate", indeterminate_speed=1.5)
 
         self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
@@ -182,7 +184,7 @@ class ResourceHubPro(ctk.CTk):
         query = self.query_entry.get()
         if not query: return
 
-        # UI Feedback: Show and start spinner
+        # UI Updates: Show spinner and hide previous results
         self.spinner.pack(after=self.progress_bar, pady=5)
         self.spinner.start()
 
@@ -190,7 +192,7 @@ class ResourceHubPro(ctk.CTk):
             try:
                 asyncio.run(self.scrape_logic(query))
             finally:
-                # Cleanup: Stop and hide spinner on main thread
+                # Cleanup: Hide spinner on thread completion
                 self.after(0, self.spinner.stop)
                 self.after(0, self.spinner.pack_forget)
 
