@@ -24,6 +24,7 @@ PRIORITY_COLORS = {
     "LOW": "#95a5a6"
 }
 
+
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
@@ -32,23 +33,33 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
+
 # --- SITES LIST ---
 SITES = [
-    {"name": "SCC Workforce", "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs", "addr": "1810 N Greene St, Spokane, WA 99217"},
-    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/", "addr": "130 S Arthur St, Spokane, WA 99202"},
+    {"name": "SCC Workforce",
+     "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs",
+     "addr": "1810 N Greene St, Spokane, WA 99217"},
+    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/",
+     "addr": "130 S Arthur St, Spokane, WA 99202"},
     {"name": "Craigslist Jobs", "url": "https://spokane.craigslist.org/search/jjj", "addr": "Spokane Area"},
     {"name": "Spokane Housing", "url": "https://www.spokanehousing.org/", "addr": "25 W Nora Ave, Spokane, WA 99205"},
-    {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/", "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
-    {"name": "Catholic Charities", "url": "https://www.cceasternwa.org/housing", "addr": "12 E 5th Ave, Spokane, WA 99202"},
-    {"name": "City of Spokane", "url": "https://my.spokanecity.org/chhs/resources/", "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
+    {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/",
+     "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
+    {"name": "Catholic Charities", "url": "https://www.cceasternwa.org/housing",
+     "addr": "12 E 5th Ave, Spokane, WA 99202"},
+    {"name": "City of Spokane", "url": "https://my.spokanecity.org/chhs/resources/",
+     "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
     {"name": "HSSA Spokane", "url": "https://hssaspokane.org/", "addr": "120 N Stevens St, Spokane, WA 99201"},
     {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
-    {"name": "LinkedIn - Spokane", "url": "https://www.linkedin.com/jobs/search/?location=Spokane%2C%20Washington", "addr": "Remote/Various"},
+    {"name": "LinkedIn - Spokane", "url": "https://www.linkedin.com/jobs/search/?location=Spokane%2C%20Washington",
+     "addr": "Remote/Various"},
     {"name": "Local Resource Hubs", "url": "https://www.localresourcehubs.com/", "addr": "Remote/Various"},
     {"name": "Job Search", "url": "https://www.jobsearch.com/", "addr": "Remote/Various"},
     {"name": "ENV LLC", "url": "https://www.envllc.com/careers/job-opportunities/", "addr": "Remote/Various"},
-    {"name": "Bold Second Chance Grant", "url": "https://bold.org/scholarships/second-chance-scholarship/", "addr": "Remote/Various"}
+    {"name": "Bold Second Chance Grant", "url": "https://bold.org/scholarships/second-chance-scholarship/",
+     "addr": "Remote/Various"}
 ]
+
 
 class ResourceHubPro(ctk.CTk):
     def __init__(self):
@@ -78,7 +89,8 @@ class ResourceHubPro(ctk.CTk):
 
         ctk.CTkButton(head_f, text="Launch Deep Scan", fg_color="#2ecc71", hover_color="#27ae60",
                       command=self.run_aggregator).pack(side="left", padx=5)
-        ctk.CTkButton(head_f, text="Export CSV", fg_color="#34495e", command=self.export_to_csv).pack(side="left", padx=5)
+        ctk.CTkButton(head_f, text="Export CSV", fg_color="#34495e", command=self.export_to_csv).pack(side="left",
+                                                                                                      padx=5)
 
         self.count_label = ctk.CTkLabel(head_f, text="Found: 0", font=("Arial", 14, "bold"), text_color="#2ecc71")
         self.count_label.pack(side="right", padx=20)
@@ -86,6 +98,9 @@ class ResourceHubPro(ctk.CTk):
         self.progress_bar = ctk.CTkProgressBar(tab, width=900)
         self.progress_bar.set(0)
         self.progress_bar.pack(pady=5)
+
+        # SPINNER: Indeterminate progress bar to show active thread work
+        self.spinner = ctk.CTkProgressBar(tab, width=400, mode="indeterminate", indeterminate_speed=1.5)
 
         self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
         self.results_frame.pack(fill="both", expand=True, padx=10, pady=5)
@@ -134,7 +149,8 @@ class ResourceHubPro(ctk.CTk):
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, executable_path=exec_path)
-            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
             urgent_keywords = ["grant", "deadline", "emergency", "urgent", "immediate", "hiring now"]
 
@@ -149,7 +165,8 @@ class ResourceHubPro(ctk.CTk):
                         phone_str = phone_match.group(0) if phone_match else "See Site"
                         priority = "URGENT" if any(kw in content.lower() for kw in urgent_keywords) else "NORMAL"
 
-                        self.after(0, lambda: self.add_result_row(site, query, phone_str, priority))
+                        self.after(0,
+                                   lambda s=site, q=query, p=phone_str, pr=priority: self.add_result_row(s, q, p, pr))
                     await page.close()
                 except:
                     pass
@@ -162,8 +179,21 @@ class ResourceHubPro(ctk.CTk):
             winsound.MessageBeep()
 
     def run_aggregator(self):
+        query = self.query_entry.get()
+        if not query: return
+
+        # UI Feedback: Show and start spinner
+        self.spinner.pack(after=self.progress_bar, pady=5)
+        self.spinner.start()
+
         def start_loop():
-            asyncio.run(self.scrape_logic(self.query_entry.get()))
+            try:
+                asyncio.run(self.scrape_logic(query))
+            finally:
+                # Cleanup: Stop and hide spinner on main thread
+                self.after(0, self.spinner.stop)
+                self.after(0, self.spinner.pack_forget)
+
         threading.Thread(target=start_loop, daemon=True).start()
 
     def export_to_csv(self):
@@ -182,9 +212,11 @@ class ResourceHubPro(ctk.CTk):
 
     def setup_settings_tab(self):
         tab = self.tabview.tab("Settings")
-        ctk.CTkLabel(tab, text=f"Spokane Scraper {VERSION}", font=("Arial", 18, "bold"), text_color="#2ecc71").pack(pady=20)
+        ctk.CTkLabel(tab, text=f"Spokane Scraper {VERSION}", font=("Arial", 18, "bold"), text_color="#2ecc71").pack(
+            pady=20)
         ctk.CTkLabel(tab, text="SCC Software Development - AAS Program").pack()
         ctk.CTkLabel(tab, text="Target: Acer Aspire 14 AI Deployment").pack(pady=10)
+
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
