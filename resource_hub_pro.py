@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox
 from urllib.parse import quote
 
 # --- CONFIGURATION ---
-VERSION = "v2.5-GreenDot"
+VERSION = "v2.6-GreenDot-Optimized"
 SETTINGS_FILE = "user_settings.json"
 
 PRIORITY_COLORS = {
@@ -66,7 +66,10 @@ class ResourceHubPro(ctk.CTk):
         super().__init__()
         self.title(f"Spokane Resource Hub Pro - {VERSION}")
         self.geometry("1150x850")
+
+        # High DPI scaling for modern laptop screens
         ctk.set_appearance_mode("dark")
+        ctk.set_widget_scaling(1.1)
 
         self.results_data = []
         self.results_count = 0
@@ -84,7 +87,6 @@ class ResourceHubPro(ctk.CTk):
         head_f = ctk.CTkFrame(tab, fg_color="transparent")
         head_f.pack(fill="x", pady=10)
 
-        # ENTRY: Added .bind("<Return>") to trigger search via Enter key
         self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (e.g. Python, Grant, Housing)...", width=450)
         self.query_entry.pack(side="left", padx=10)
         self.query_entry.bind("<Return>", lambda event: self.run_aggregator())
@@ -101,7 +103,6 @@ class ResourceHubPro(ctk.CTk):
         self.progress_bar.set(0)
         self.progress_bar.pack(pady=5)
 
-        # SPINNER: Indeterminate bar to show activity during browser launch
         self.spinner = ctk.CTkProgressBar(tab, width=400, mode="indeterminate", indeterminate_speed=1.5)
 
         self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
@@ -110,7 +111,6 @@ class ResourceHubPro(ctk.CTk):
     def add_result_row(self, site, query, phone, priority):
         self.results_count += 1
         self.count_label.configure(text=f"Found: {self.results_count}")
-
         self.results_data.append([priority, site['name'], query, phone, site['url']])
 
         p_color = PRIORITY_COLORS.get(priority, "#808080")
@@ -133,47 +133,42 @@ class ResourceHubPro(ctk.CTk):
 
     async def scrape_logic(self, query):
         if not query: return
+        self.after(0, lambda: [self.count_label.configure(text="Found: 0"), self.progress_bar.set(0)])
+        self.after(0, lambda: [w.destroy() for w in self.results_frame.winfo_children()])
 
         self.results_count = 0
         self.results_data = []
-        self.after(0, lambda: self.count_label.configure(text="Found: 0"))
-        self.after(0, lambda: [w.destroy() for w in self.results_frame.winfo_children()])
-        self.after(0, lambda: self.progress_bar.set(0))
-
-        exec_path = None
-        if getattr(sys, 'frozen', False):
-            browser_dir = resource_path(os.path.join("playwright", "driver", "package", ".local-browsers"))
-            if os.path.exists(browser_dir):
-                for f in os.listdir(browser_dir):
-                    if f.startswith("chromium-"):
-                        exec_path = os.path.join(browser_dir, f, "chrome-win", "chrome.exe")
-                        break
+        sem = asyncio.Semaphore(5)  # Limit to 5 concurrent pages to save RAM
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True, executable_path=exec_path)
+            browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
-            urgent_keywords = ["grant", "deadline", "emergency", "urgent", "immediate", "hiring now"]
-
             async def process_site(site):
-                try:
-                    page = await context.new_page()
-                    await page.goto(site['url'], timeout=25000, wait_until="domcontentloaded")
-                    content = await page.content()
+                async with sem:
+                    try:
+                        page = await context.new_page()
+                        # Optimization: Block images/CSS/fonts to speed up load times
+                        await page.route("**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2,ttf}", lambda route: route.abort())
 
-                    if query.lower() in content.lower():
-                        phone_match = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', content)
-                        phone_str = phone_match.group(0) if phone_match else "See Site"
-                        priority = "URGENT" if any(kw in content.lower() for kw in urgent_keywords) else "NORMAL"
+                        await page.goto(site['url'], timeout=20000, wait_until="domcontentloaded")
+                        content = await page.content()
 
-                        self.after(0,
-                                   lambda s=site, q=query, p=phone_str, pr=priority: self.add_result_row(s, q, p, pr))
-                    await page.close()
-                except:
-                    pass
-                finally:
-                    self.after(0, lambda: self.progress_bar.set(self.progress_bar.get() + (1 / len(SITES))))
+                        if query.lower() in content.lower():
+                            phone_match = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', content)
+                            phone_str = phone_match.group(0) if phone_match else "See Site"
+
+                            urgent_keywords = ["grant", "deadline", "emergency", "urgent", "immediate", "hiring now"]
+                            priority = "URGENT" if any(kw in content.lower() for kw in urgent_keywords) else "NORMAL"
+
+                            self.after(0, lambda s=site, q=query, p=phone_str, pr=priority: self.add_result_row(s, q, p,
+                                                                                                                pr))
+                        await page.close()
+                    except:
+                        pass
+                    finally:
+                        self.after(0, lambda: self.progress_bar.set(self.progress_bar.get() + (1 / len(SITES))))
 
             await asyncio.gather(*[process_site(s) for s in SITES])
             await browser.close()
@@ -184,7 +179,6 @@ class ResourceHubPro(ctk.CTk):
         query = self.query_entry.get()
         if not query: return
 
-        # UI Updates: Show spinner and hide previous results
         self.spinner.pack(after=self.progress_bar, pady=5)
         self.spinner.start()
 
@@ -192,7 +186,6 @@ class ResourceHubPro(ctk.CTk):
             try:
                 asyncio.run(self.scrape_logic(query))
             finally:
-                # Cleanup: Hide spinner on thread completion
                 self.after(0, self.spinner.stop)
                 self.after(0, self.spinner.pack_forget)
 
