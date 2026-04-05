@@ -24,16 +24,6 @@ PRIORITY_COLORS = {
     "LOW": "#95a5a6"
 }
 
-
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-
 # --- SITES LIST ---
 SITES = [
     {"name": "SCC Workforce",
@@ -67,7 +57,6 @@ class ResourceHubPro(ctk.CTk):
         self.title(f"Spokane Resource Hub Pro - {VERSION}")
         self.geometry("1150x850")
 
-        # High DPI scaling for modern laptop screens
         ctk.set_appearance_mode("dark")
         ctk.set_widget_scaling(1.1)
 
@@ -89,7 +78,7 @@ class ResourceHubPro(ctk.CTk):
 
         self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (e.g. Python, Grant, Housing)...", width=450)
         self.query_entry.pack(side="left", padx=10)
-        self.query_entry.bind("<Return>", lambda event: self.run_aggregator())
+        self.query_entry.bind("<Return>", lambda e: self.run_aggregator())
 
         ctk.CTkButton(head_f, text="Launch Deep Scan", fg_color="#2ecc71", hover_color="#27ae60",
                       command=self.run_aggregator).pack(side="left", padx=5)
@@ -114,8 +103,9 @@ class ResourceHubPro(ctk.CTk):
         self.results_data.append([priority, site['name'], query, phone, site['url']])
 
         p_color = PRIORITY_COLORS.get(priority, "#808080")
-        row = ctk.CTkFrame(self.results_frame, fg_color="#242424", height=60)
+        row = ctk.CTkFrame(self.results_frame, fg_color="#242424", height=70)
         row.pack(fill="x", pady=3, padx=5)
+        row.pack_propagate(False)
 
         ctk.CTkLabel(row, text=priority, text_color=p_color, font=("Arial", 11, "bold"), width=100).pack(side="left")
         ctk.CTkLabel(row, text=f"{query.upper()} OPPORTUNITY\n{site['name']}", justify="left", anchor="w",
@@ -125,7 +115,9 @@ class ResourceHubPro(ctk.CTk):
         btn_f = ctk.CTkFrame(row, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
 
+        # Fixed Maps URL formatting
         maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}"
+
         ctk.CTkButton(btn_f, text="Directions", width=80, fg_color="#444",
                       command=lambda: webbrowser.open(maps_url)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Apply", width=80, fg_color="#3498db",
@@ -133,12 +125,12 @@ class ResourceHubPro(ctk.CTk):
 
     async def scrape_logic(self, query):
         if not query: return
-        self.after(0, lambda: [self.count_label.configure(text="Found: 0"), self.progress_bar.set(0)])
-        self.after(0, lambda: [w.destroy() for w in self.results_frame.winfo_children()])
+        self.after(0, lambda: [self.count_label.configure(text="Found: 0"), self.progress_bar.set(0),
+                               [w.destroy() for w in self.results_frame.winfo_children()]])
 
         self.results_count = 0
         self.results_data = []
-        sem = asyncio.Semaphore(5)  # Limit to 5 concurrent pages to save RAM
+        sem = asyncio.Semaphore(4)  # Optimized for Aspire 14 AI resource management
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -147,13 +139,14 @@ class ResourceHubPro(ctk.CTk):
 
             async def process_site(site):
                 async with sem:
+                    page = await context.new_page()
                     try:
-                        page = await context.new_page()
-                        # Optimization: Block images/CSS/fonts to speed up load times
+                        # Asset blocking to save bandwidth and CPU
                         await page.route("**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2,ttf}", lambda route: route.abort())
+                        await page.goto(site['url'], timeout=15000, wait_until="domcontentloaded")
 
-                        await page.goto(site['url'], timeout=20000, wait_until="domcontentloaded")
-                        content = await page.content()
+                        # Extracting text directly for faster processing
+                        content = await page.evaluate("() => document.body.innerText")
 
                         if query.lower() in content.lower():
                             phone_match = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', content)
@@ -164,21 +157,20 @@ class ResourceHubPro(ctk.CTk):
 
                             self.after(0, lambda s=site, q=query, p=phone_str, pr=priority: self.add_result_row(s, q, p,
                                                                                                                 pr))
-                        await page.close()
                     except:
                         pass
                     finally:
+                        await page.close()
                         self.after(0, lambda: self.progress_bar.set(self.progress_bar.get() + (1 / len(SITES))))
 
             await asyncio.gather(*[process_site(s) for s in SITES])
             await browser.close()
             self.after(0, lambda: self.progress_bar.set(1.0))
-            winsound.MessageBeep()
+            winsound.Beep(1000, 200)
 
     def run_aggregator(self):
         query = self.query_entry.get()
         if not query: return
-
         self.spinner.pack(after=self.progress_bar, pady=5)
         self.spinner.start()
 
@@ -193,9 +185,8 @@ class ResourceHubPro(ctk.CTk):
 
     def export_to_csv(self):
         if not self.results_data:
-            messagebox.showwarning("No Data", "Perform a scan first to collect results.")
+            messagebox.showwarning("No Data", "Perform a scan first.")
             return
-
         file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")],
                                                  initialfile=f"Spokane_Resources_{datetime.now().strftime('%Y%m%d')}.csv")
         if file_path:
@@ -203,14 +194,14 @@ class ResourceHubPro(ctk.CTk):
                 writer = csv.writer(f)
                 writer.writerow(["Priority", "Site Name", "Query", "Phone", "URL"])
                 writer.writerows(self.results_data)
-            messagebox.showinfo("Success", f"Data exported to {file_path}")
+            messagebox.showinfo("Success", f"Exported to {file_path}")
 
     def setup_settings_tab(self):
         tab = self.tabview.tab("Settings")
         ctk.CTkLabel(tab, text=f"Spokane Scraper {VERSION}", font=("Arial", 18, "bold"), text_color="#2ecc71").pack(
             pady=20)
         ctk.CTkLabel(tab, text="SCC Software Development - AAS Program").pack()
-        ctk.CTkLabel(tab, text="Target: Acer Aspire 14 AI Deployment").pack(pady=10)
+        ctk.CTkLabel(tab, text="Optimized for Acer Aspire 14 AI").pack(pady=10)
 
 
 if __name__ == "__main__":
