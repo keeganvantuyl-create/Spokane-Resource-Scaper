@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox
 from urllib.parse import quote
 
 # --- CONFIGURATION ---
-VERSION = "v2.6-GreenDot-Optimized"
+VERSION = "v2.7-2026-Grant-Edition"
 SETTINGS_FILE = "user_settings.json"
 
 PRIORITY_COLORS = {
@@ -24,23 +24,31 @@ PRIORITY_COLORS = {
     "LOW": "#95a5a6"
 }
 
-# --- SITES LIST ---
+# --- SITES LIST (Updated for 2026 WA/Federal Grants) ---
 SITES = [
+    # Local Spokane
     {"name": "SCC Workforce", "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs", "addr": "1810 N Greene St, Spokane, WA 99217"},
     {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/", "addr": "130 S Arthur St, Spokane, WA 99202"},
-    {"name": "Craigslist Jobs", "url": "https://spokane.craigslist.org/search/jjj", "addr": "Spokane, WA"},
-    {"name": "Spokane Housing", "url": "https://www.spokanehousing.org/", "addr": "25 W Nora Ave, Spokane, WA 99205"},
     {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/", "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
-    {"name": "Catholic Charities", "url": "https://www.cceasternwa.org/housing", "addr": "12 E 5th Ave, Spokane, WA 99202"},
-    {"name": "City of Spokane", "url": "https://my.spokanecity.org/chhs/resources/", "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
-    {"name": "HSSA Spokane", "url": "https://hssaspokane.org/", "addr": "120 N Stevens St, Spokane, WA 99201"},
-    {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Spokane, WA"},
-    {"name": "LinkedIn - Spokane", "url": "https://www.linkedin.com/jobs/search/?location=Spokane%2C%20Washington", "addr": "Spokane, WA"},
-    {"name": "Local Resource Hubs", "url": "https://www.localresourcehubs.com/", "addr": "Spokane, WA"},
-    {"name": "Job Search", "url": "https://www.jobsearch.com/", "addr": "Spokane, WA"},
-    {"name": "ENV LLC", "url": "https://www.envllc.com/careers/job-opportunities/", "addr": "Spokane, WA"},
-    {"name": "Bold Second Chance Grant", "url": "https://bold.org/scholarships/second-chance-scholarship/", "addr": "Spokane, WA"}
+    {"name": "Spokane County HCD", "url": "https://www.spokanecounty.gov/5944/2026-HCD-RFPs", "addr": "1101 W College Ave, Spokane, WA 99260"},
+    
+    # Washington State Portals
+    {"name": "WA Commerce Contracts", "url": "https://www.commerce.wa.gov/contracting/", "addr": "Washington State"},
+    {"name": "WA GrantWatch (Individual)", "url": "https://washington.grantwatch.com/cat/46/individual-grants.html", "addr": "Washington State"},
+    {"name": "FundHub WA", "url": "https://fundhub.wa.gov/funding-opportunities/", "addr": "Olympia, WA"},
+    {"name": "Serve Washington", "url": "https://servewashington.wa.gov/funding-opportunities/", "addr": "Washington State"},
+    
+    # Federal / National Portals
+    {"name": "HUD Federal Grants", "url": "https://www.hud.gov/hud-partners/grants-info-funding-opps", "addr": "Federal/Remote"},
+    {"name": "Grants.gov Search", "url": "https://www.grants.gov/search-grants", "addr": "Federal/Remote"},
+    
+    # General Opportunities
+    {"name": "Craigslist Jobs", "url": "https://spokane.craigslist.org/search/jjj", "addr": "Spokane Area"},
+    {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
+    {"name": "LinkedIn - Spokane", "url": "https://www.linkedin.com/jobs/search/?location=Spokane%2C%20Washington", "addr": "Remote/Various"},
+    {"name": "Bold Second Chance Grant", "url": "https://bold.org/scholarships/second-chance-scholarship/", "addr": "Remote/Various"}
 ]
+
 
 class ResourceHubPro(ctk.CTk):
     def __init__(self):
@@ -67,7 +75,7 @@ class ResourceHubPro(ctk.CTk):
         head_f = ctk.CTkFrame(tab, fg_color="transparent")
         head_f.pack(fill="x", pady=10)
 
-        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (e.g. Python, Grant, Housing)...", width=450)
+        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (e.g. Grant, CRP, Workforce, Housing)...", width=450)
         self.query_entry.pack(side="left", padx=10)
         self.query_entry.bind("<Return>", lambda e: self.run_aggregator())
 
@@ -105,7 +113,7 @@ class ResourceHubPro(ctk.CTk):
         btn_f = ctk.CTkFrame(row, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
 
-        # Fixed Maps URL formatting
+        # Fixed Maps URL
         maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}"
 
         ctk.CTkButton(btn_f, text="Directions", width=80, fg_color="#444",
@@ -138,7 +146,7 @@ class ResourceHubPro(ctk.CTk):
                             phone_match = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', content)
                             phone_str = phone_match.group(0) if phone_match else "See Site"
                             
-                            urgent_keywords = ["grant", "deadline", "emergency", "urgent", "immediate", "hiring now"]
+                            urgent_keywords = ["grant", "deadline", "emergency", "urgent", "immediate", "rfa", "nofo"]
                             priority = "URGENT" if any(kw in content.lower() for kw in urgent_keywords) else "NORMAL"
 
                             self.after(0, lambda s=site, q=query, ph=phone_str, pr=priority: self.add_result_row(s, q, ph, pr))
