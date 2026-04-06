@@ -26,30 +26,21 @@ PRIORITY_COLORS = {
 
 # --- SITES LIST ---
 SITES = [
-    {"name": "SCC Workforce",
-     "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs",
-     "addr": "1810 N Greene St, Spokane, WA 99217"},
-    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/",
-     "addr": "130 S Arthur St, Spokane, WA 99202"},
-    {"name": "Craigslist Jobs", "url": "https://spokane.craigslist.org/search/jjj", "addr": "Spokane Area"},
+    {"name": "SCC Workforce", "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs", "addr": "1810 N Greene St, Spokane, WA 99217"},
+    {"name": "WorkSource Spokane", "url": "https://worksourcespokane.com/job-seekers/job-opportunities/", "addr": "130 S Arthur St, Spokane, WA 99202"},
+    {"name": "Craigslist Jobs", "url": "https://spokane.craigslist.org/search/jjj", "addr": "Spokane, WA"},
     {"name": "Spokane Housing", "url": "https://www.spokanehousing.org/", "addr": "25 W Nora Ave, Spokane, WA 99205"},
-    {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/",
-     "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
-    {"name": "Catholic Charities", "url": "https://www.cceasternwa.org/housing",
-     "addr": "12 E 5th Ave, Spokane, WA 99202"},
-    {"name": "City of Spokane", "url": "https://my.spokanecity.org/chhs/resources/",
-     "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
+    {"name": "SNAP Spokane", "url": "https://www.snapwa.org/rental-housing-information-resources-and-support/", "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
+    {"name": "Catholic Charities", "url": "https://www.cceasternwa.org/housing", "addr": "12 E 5th Ave, Spokane, WA 99202"},
+    {"name": "City of Spokane", "url": "https://my.spokanecity.org/chhs/resources/", "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
     {"name": "HSSA Spokane", "url": "https://hssaspokane.org/", "addr": "120 N Stevens St, Spokane, WA 99201"},
-    {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
-    {"name": "LinkedIn - Spokane", "url": "https://www.linkedin.com/jobs/search/?location=Spokane%2C%20Washington",
-     "addr": "Remote/Various"},
-    {"name": "Local Resource Hubs", "url": "https://www.localresourcehubs.com/", "addr": "Remote/Various"},
-    {"name": "Job Search", "url": "https://www.jobsearch.com/", "addr": "Remote/Various"},
-    {"name": "ENV LLC", "url": "https://www.envllc.com/careers/job-opportunities/", "addr": "Remote/Various"},
-    {"name": "Bold Second Chance Grant", "url": "https://bold.org/scholarships/second-chance-scholarship/",
-     "addr": "Remote/Various"}
+    {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Spokane, WA"},
+    {"name": "LinkedIn - Spokane", "url": "https://www.linkedin.com/jobs/search/?location=Spokane%2C%20Washington", "addr": "Spokane, WA"},
+    {"name": "Local Resource Hubs", "url": "https://www.localresourcehubs.com/", "addr": "Spokane, WA"},
+    {"name": "Job Search", "url": "https://www.jobsearch.com/", "addr": "Spokane, WA"},
+    {"name": "ENV LLC", "url": "https://www.envllc.com/careers/job-opportunities/", "addr": "Spokane, WA"},
+    {"name": "Bold Second Chance Grant", "url": "https://bold.org/scholarships/second-chance-scholarship/", "addr": "Spokane, WA"}
 ]
-
 
 class ResourceHubPro(ctk.CTk):
     def __init__(self):
@@ -82,8 +73,7 @@ class ResourceHubPro(ctk.CTk):
 
         ctk.CTkButton(head_f, text="Launch Deep Scan", fg_color="#2ecc71", hover_color="#27ae60",
                       command=self.run_aggregator).pack(side="left", padx=5)
-        ctk.CTkButton(head_f, text="Export CSV", fg_color="#34495e", command=self.export_to_csv).pack(side="left",
-                                                                                                      padx=5)
+        ctk.CTkButton(head_f, text="Export CSV", fg_color="#34495e", command=self.export_to_csv).pack(side="left", padx=5)
 
         self.count_label = ctk.CTkLabel(head_f, text="Found: 0", font=("Arial", 14, "bold"), text_color="#2ecc71")
         self.count_label.pack(side="right", padx=20)
@@ -119,9 +109,9 @@ class ResourceHubPro(ctk.CTk):
         maps_url = f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}"
 
         ctk.CTkButton(btn_f, text="Directions", width=80, fg_color="#444",
-                      command=lambda: webbrowser.open(maps_url)).pack(side="left", padx=2)
+                      command=lambda u=maps_url: webbrowser.open(u)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Apply", width=80, fg_color="#3498db",
-                      command=lambda: webbrowser.open(site['url'])).pack(side="left", padx=2)
+                      command=lambda u=site['url']: webbrowser.open(u)).pack(side="left", padx=2)
 
     async def scrape_logic(self, query):
         if not query: return
@@ -130,33 +120,28 @@ class ResourceHubPro(ctk.CTk):
 
         self.results_count = 0
         self.results_data = []
-        sem = asyncio.Semaphore(4)  # Optimized for Aspire 14 AI resource management
+        sem = asyncio.Semaphore(4)
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
             async def process_site(site):
                 async with sem:
                     page = await context.new_page()
                     try:
-                        # Asset blocking to save bandwidth and CPU
                         await page.route("**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2,ttf}", lambda route: route.abort())
                         await page.goto(site['url'], timeout=15000, wait_until="domcontentloaded")
-
-                        # Extracting text directly for faster processing
                         content = await page.evaluate("() => document.body.innerText")
 
                         if query.lower() in content.lower():
                             phone_match = re.search(r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', content)
                             phone_str = phone_match.group(0) if phone_match else "See Site"
-
+                            
                             urgent_keywords = ["grant", "deadline", "emergency", "urgent", "immediate", "hiring now"]
                             priority = "URGENT" if any(kw in content.lower() for kw in urgent_keywords) else "NORMAL"
 
-                            self.after(0, lambda s=site, q=query, p=phone_str, pr=priority: self.add_result_row(s, q, p,
-                                                                                                                pr))
+                            self.after(0, lambda s=site, q=query, ph=phone_str, pr=priority: self.add_result_row(s, q, ph, pr))
                     except:
                         pass
                     finally:
@@ -198,11 +183,9 @@ class ResourceHubPro(ctk.CTk):
 
     def setup_settings_tab(self):
         tab = self.tabview.tab("Settings")
-        ctk.CTkLabel(tab, text=f"Spokane Scraper {VERSION}", font=("Arial", 18, "bold"), text_color="#2ecc71").pack(
-            pady=20)
+        ctk.CTkLabel(tab, text=f"Spokane Scraper {VERSION}", font=("Arial", 18, "bold"), text_color="#2ecc71").pack(pady=20)
         ctk.CTkLabel(tab, text="SCC Software Development - AAS Program").pack()
         ctk.CTkLabel(tab, text="Optimized for Acer Aspire 14 AI").pack(pady=10)
-
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
