@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox
 from urllib.parse import quote
 
 # --- CONFIGURATION ---
-VERSION = "v3.2-Final-Optimized"
+VERSION = "v3.3-AntiBlock-Optimized"
 SETTINGS_FILE = "user_settings.json"
 PROFILE_FILE = "user_profile.json"
 
@@ -56,6 +56,7 @@ class ResourceHubPro(ctk.CTk):
         self.setup_profile_tab()
         self.setup_settings_tab()
 
+    # --- DATA PERSISTENCE ---
     def load_profile(self):
         if os.path.exists(PROFILE_FILE):
             with open(PROFILE_FILE, "r") as f:
@@ -73,15 +74,17 @@ class ResourceHubPro(ctk.CTk):
         }
         with open(PROFILE_FILE, "w") as f:
             json.dump(self.user_data, f)
-        messagebox.showinfo("Success", "Profile saved!")
+        messagebox.showinfo("Success", "Identity Profile Saved!")
 
+    # --- UI SETUP ---
     def setup_board_tab(self):
         tab = self.tabview.tab("Resource Board")
         head_f = ctk.CTkFrame(tab, fg_color="transparent")
         head_f.pack(fill="x", pady=10)
 
-        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search Resources...", width=450)
+        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search Resources (e.g., Grant)...", width=450)
         self.query_entry.pack(side="left", padx=10)
+        # Restore Enter Key Binding
         self.query_entry.bind("<Return>", lambda e: self.run_aggregator())
 
         ctk.CTkButton(head_f, text="Launch Deep Scan", fg_color="#2ecc71", command=self.run_aggregator).pack(side="left", padx=5)
@@ -94,7 +97,7 @@ class ResourceHubPro(ctk.CTk):
         self.progress_bar.set(0)
         self.progress_bar.pack(pady=5)
 
-        # Restored Spinner
+        # Restore Spinner
         self.spinner = ctk.CTkProgressBar(tab, width=400, mode="indeterminate", indeterminate_speed=1.5)
 
         self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
@@ -104,13 +107,13 @@ class ResourceHubPro(ctk.CTk):
         tab = self.tabview.tab("My Profile")
         f = ctk.CTkFrame(tab, fg_color="transparent")
         f.pack(pady=40)
-        ctk.CTkLabel(f, text="Auto-Fill Identity", font=("Arial", 24, "bold"), text_color="#2ecc71").grid(row=0, columnspan=2, pady=20)
+        ctk.CTkLabel(f, text="Autofill Details", font=("Arial", 24, "bold"), text_color="#2ecc71").grid(row=0, columnspan=2, pady=20)
         
         self.ent_fname = self.make_entry(f, "First Name", 1)
         self.ent_lname = self.make_entry(f, "Last Name", 2)
         self.ent_email = self.make_entry(f, "Email", 3)
         self.ent_phone = self.make_entry(f, "Phone", 4)
-        self.ent_port = self.make_entry(f, "Portfolio/GitHub", 5)
+        self.ent_port = self.make_entry(f, "Portfolio Link", 5)
 
         self.ent_fname.insert(0, self.user_data.get("first_name", ""))
         self.ent_lname.insert(0, self.user_data.get("last_name", ""))
@@ -126,6 +129,7 @@ class ResourceHubPro(ctk.CTk):
         entry.grid(row=row, column=1, padx=20, pady=10)
         return entry
 
+    # --- AUTOMATION LOGIC ---
     async def auto_apply_logic(self, url):
         field_map = {
             "first_name": ["fname", "firstname", "first_name", "given-name"],
@@ -134,15 +138,16 @@ class ResourceHubPro(ctk.CTk):
             "phone": ["phone", "tel", "mobile", "contact"]
         }
         async with async_playwright() as p:
+            # Headed browser so you can see the result and click Submit
             browser = await p.chromium.launch(headless=False) 
             page = await browser.new_context().new_page()
-            await page.goto(url)
+            await page.goto(url, wait_until="networkidle")
             for key, aliases in field_map.items():
                 val = self.user_data.get(key)
                 if not val: continue
                 selector = ", ".join([f'input[name*="{a}" i], input[id*="{a}" i]' for a in aliases])
                 try:
-                    await page.wait_for_selector(selector, timeout=3000)
+                    await page.wait_for_selector(selector, timeout=4000)
                     await page.fill(selector, val)
                 except: pass
 
@@ -169,27 +174,33 @@ class ResourceHubPro(ctk.CTk):
         self.after(0, lambda: [self.count_label.configure(text="Found: 0"), self.progress_bar.set(0), [w.destroy() for w in self.results_frame.winfo_children()]])
         self.results_count = 0
         self.results_data = []
-        sem = asyncio.Semaphore(5)
+        sem = asyncio.Semaphore(4) # Lowered for stability on high-load sites
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context()
+            # Added slow_mo to appear more human and avoid bot-detection
+            browser = await p.chromium.launch(headless=True, slow_mo=50)
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            )
+            
             async def process_site(site):
                 async with sem:
                     page = await context.new_page()
                     try:
-                        await page.goto(site['url'], timeout=12000, wait_until="domcontentloaded")
+                        # Increased timeout to 25s to prevent missing results due to lag
+                        await page.goto(site['url'], timeout=25000, wait_until="domcontentloaded")
                         content = await page.evaluate("() => document.body.innerText")
                         if query.lower() in content.lower():
                             pr = "URGENT" if "deadline" in content.lower() else "NORMAL"
                             self.after(0, lambda s=site, q=query, p=pr: self.add_result_row(s, q, p))
-                    except: pass
+                    except: pass # Catch timeouts silently
                     finally:
                         await page.close()
                         self.after(0, lambda: self.progress_bar.set(self.progress_bar.get() + (1 / len(SITES))))
             
             await asyncio.gather(*[process_site(s) for s in SITES])
             await browser.close()
+            # Clean up UI
             self.after(0, self.spinner.stop)
             self.after(0, self.spinner.pack_forget)
             winsound.Beep(1000, 200)
@@ -213,7 +224,7 @@ class ResourceHubPro(ctk.CTk):
     def setup_settings_tab(self):
         tab = self.tabview.tab("Settings")
         ctk.CTkLabel(tab, text=f"Resource Hub Pro {VERSION}", font=("Arial", 18, "bold"), text_color="#2ecc71").pack(pady=20)
-        ctk.CTkLabel(tab, text="Optimized for Acer Aspire 14 AI Hardware").pack()
+        ctk.CTkLabel(tab, text="SCC Software Development - 2026 Optimized").pack()
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
