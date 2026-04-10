@@ -15,23 +15,22 @@ from tkinter import filedialog, messagebox
 from urllib.parse import quote
 
 # --- CONFIGURATION ---
-VERSION = "v3.5-Inclusive-2026"
+VERSION = "v3.6-OneClick-Dashboard"
 PROFILE_FILE = "user_profile.json"
 
 PRIORITY_COLORS = {"URGENT": "#e74c3c", "NORMAL": "#3498db"}
 
-# UPDATED SITES including Disability Resources
 SITES = [
     {"name": "SCC Workforce Grants", "url": "https://scc.spokane.edu/For-Our-Students/Student-Resources/Specially-Funded-Programs", "addr": "1810 N Greene St, Spokane, WA 99217"},
-    {"name": "WorkSource Spokane (Expo 2026)", "url": "https://worksourcespokane.com/", "addr": "130 S Arthur St, Spokane, WA 99202"},
-    {"name": "SNAP Energy Assistance", "url": "https://www.snapenergyassistance.org/", "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
-    {"name": "City of Spokane CHHS Funding", "url": "https://my.spokanecity.org/chhs/funding-opportunities/", "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
-    {"name": "The Arc of Spokane", "url": "https://www.arcspokane.org/supported-employment", "addr": "320 E 2nd Ave, Spokane, WA 99202"},
-    {"name": "Pioneer Human Services", "url": "https://pioneerhumanservices.org/treatment/counseling", "addr": "101 W 8th Ave, Spokane, WA 99204"},
+    {"name": "WorkSource Spokane (Jobs/Expo)", "url": "https://worksourcespokane.com/", "addr": "130 S Arthur St, Spokane, WA 99202"},
+    {"name": "SNAP Energy/Housing", "url": "https://www.snapenergyassistance.org/", "addr": "3102 W Fort George Wright Dr, Spokane, WA 99224"},
+    {"name": "City of Spokane CHHS (Shelter)", "url": "https://my.spokanecity.org/chhs/funding-opportunities/", "addr": "808 W Spokane Falls Blvd, Spokane, WA 99201"},
+    {"name": "The Arc of Spokane (Disability)", "url": "https://www.arcspokane.org/supported-employment", "addr": "320 E 2nd Ave, Spokane, WA 99202"},
+    {"name": "Second Harvest (Food)", "url": "https://2-harvest.org/get-help-spokane/", "addr": "1234 E Front Ave, Spokane, WA 99202"},
+    {"name": "UGM Spokane (Shelter/Food)", "url": "https://www.uniongospelmission.org/get-help", "addr": "1224 E Trent Ave, Spokane, WA 99202"},
     {"name": "WA Dept of Vocational Rehab", "url": "https://www.dshs.wa.gov/dvr", "addr": "1313 N Atlantic St, Spokane, WA 99201"},
-    {"name": "Skils'kin", "url": "https://www.skils-kin.org/employment-services", "addr": "4004 E Boone Ave, Spokane, WA 99202"},
-    {"name": "Spokane County HCD", "url": "https://www.spokanecounty.gov/3142/Current-RFP", "addr": "1101 W College Ave, Spokane, WA 99260"},
-    {"name": "Indeed - Spokane", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
+    {"name": "Skils'kin (Employment)", "url": "https://www.skils-kin.org/employment-services", "addr": "4004 E Boone Ave, Spokane, WA 99202"},
+    {"name": "Indeed - Spokane Jobs", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
     {"name": "Bold.org Scholarships", "url": "https://bold.org/scholarships/second-chance-scholarship/", "addr": "Remote/Various"}
 ]
 
@@ -59,10 +58,8 @@ class ResourceHubPro(ctk.CTk):
 
     def load_profile(self):
         if os.path.exists(PROFILE_FILE):
-            with open(PROFILE_FILE, "r") as f:
-                self.user_data = json.load(f)
-        else:
-            self.user_data = {"first_name": "", "last_name": "", "email": "", "phone": "", "portfolio": ""}
+            with open(PROFILE_FILE, "r") as f: self.user_data = json.load(f)
+        else: self.user_data = {"first_name": "", "last_name": "", "email": "", "phone": "", "portfolio": ""}
 
     def save_profile(self):
         self.user_data = {k: getattr(self, f"ent_{k[:4]}").get() for k in ["first_name", "last_name", "email", "phone", "portfolio"]}
@@ -71,10 +68,28 @@ class ResourceHubPro(ctk.CTk):
 
     def setup_board_tab(self):
         tab = self.tabview.tab("Resource Board")
+        
+        # --- QUICK ACTION DASHBOARD ---
+        dash_f = ctk.CTkFrame(tab, fg_color="transparent")
+        dash_f.pack(fill="x", pady=(10, 5))
+        
+        actions = [
+            ("💰 Grants", "#2ecc71"), ("💼 Jobs", "#3498db"), 
+            ("🏠 Housing", "#9b59b6"), ("🍎 Food", "#e67e22"), 
+            ("♿ Disability", "#f1c40f"), ("⛺ Shelter", "#e74c3c")
+        ]
+        
+        for text, color in actions:
+            btn = ctk.CTkButton(dash_f, text=text, fg_color=color, width=120, height=35,
+                                font=("Arial", 12, "bold"),
+                                command=lambda t=text.split()[-1]: self.quick_search(t))
+            btn.pack(side="left", padx=5)
+
+        # --- SEARCH HEADER ---
         head_f = ctk.CTkFrame(tab, fg_color="transparent")
         head_f.pack(fill="x", pady=10)
 
-        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (Grant, Job, Disability, RFP)...", width=450)
+        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Or type custom search here...", width=450)
         self.query_entry.pack(side="left", padx=10)
         self.query_entry.bind("<Return>", lambda e: self.run_aggregator())
 
@@ -89,6 +104,11 @@ class ResourceHubPro(ctk.CTk):
 
         self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
         self.results_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+    def quick_search(self, term):
+        self.query_entry.delete(0, 'end')
+        self.query_entry.insert(0, term)
+        self.run_aggregator()
 
     def setup_profile_tab(self):
         tab = self.tabview.tab("My Profile")
@@ -142,12 +162,7 @@ class ResourceHubPro(ctk.CTk):
             browser = await p.chromium.launch(headless=True, slow_mo=50)
             context = await browser.new_context(user_agent="Mozilla/5.0 Chrome/122.0.0.0")
             
-            # --- EXPANDED SMART MATCHING ---
-            keywords = [
-                query.lower(), "rfp", "funding", "assistance", 
-                "opportunity", "expo", "vocational", "advocacy", 
-                "disability", "supported employment", "dvr"
-            ]
+            keywords = [query.lower(), "rfp", "funding", "assistance", "opportunity", "hunger", "emergency", "vocational", "dvr"]
             
             for site in SITES:
                 page = await context.new_page()
