@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox
 from urllib.parse import quote
 
 # --- CONFIGURATION ---
-VERSION = "v3.1-Production-Ready"
+VERSION = "v3.2-Final-Optimized"
 SETTINGS_FILE = "user_settings.json"
 PROFILE_FILE = "user_profile.json"
 
@@ -56,7 +56,6 @@ class ResourceHubPro(ctk.CTk):
         self.setup_profile_tab()
         self.setup_settings_tab()
 
-    # --- PROFILE MANAGEMENT ---
     def load_profile(self):
         if os.path.exists(PROFILE_FILE):
             with open(PROFILE_FILE, "r") as f:
@@ -74,15 +73,14 @@ class ResourceHubPro(ctk.CTk):
         }
         with open(PROFILE_FILE, "w") as f:
             json.dump(self.user_data, f)
-        messagebox.showinfo("Success", "Profile saved! Auto-Apply is now ready.")
+        messagebox.showinfo("Success", "Profile saved!")
 
-    # --- UI TABS ---
     def setup_board_tab(self):
         tab = self.tabview.tab("Resource Board")
         head_f = ctk.CTkFrame(tab, fg_color="transparent")
         head_f.pack(fill="x", pady=10)
 
-        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search (Grant, CRP, Workforce)...", width=450)
+        self.query_entry = ctk.CTkEntry(head_f, placeholder_text="Search Resources...", width=450)
         self.query_entry.pack(side="left", padx=10)
         self.query_entry.bind("<Return>", lambda e: self.run_aggregator())
 
@@ -96,6 +94,9 @@ class ResourceHubPro(ctk.CTk):
         self.progress_bar.set(0)
         self.progress_bar.pack(pady=5)
 
+        # Restored Spinner
+        self.spinner = ctk.CTkProgressBar(tab, width=400, mode="indeterminate", indeterminate_speed=1.5)
+
         self.results_frame = ctk.CTkScrollableFrame(tab, width=1100, height=600, fg_color="#1a1a1a")
         self.results_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -103,7 +104,6 @@ class ResourceHubPro(ctk.CTk):
         tab = self.tabview.tab("My Profile")
         f = ctk.CTkFrame(tab, fg_color="transparent")
         f.pack(pady=40)
-
         ctk.CTkLabel(f, text="Auto-Fill Identity", font=("Arial", 24, "bold"), text_color="#2ecc71").grid(row=0, columnspan=2, pady=20)
         
         self.ent_fname = self.make_entry(f, "First Name", 1)
@@ -112,7 +112,6 @@ class ResourceHubPro(ctk.CTk):
         self.ent_phone = self.make_entry(f, "Phone", 4)
         self.ent_port = self.make_entry(f, "Portfolio/GitHub", 5)
 
-        # Pre-fill from loaded data
         self.ent_fname.insert(0, self.user_data.get("first_name", ""))
         self.ent_lname.insert(0, self.user_data.get("last_name", ""))
         self.ent_email.insert(0, self.user_data.get("email", ""))
@@ -127,7 +126,6 @@ class ResourceHubPro(ctk.CTk):
         entry.grid(row=row, column=1, padx=20, pady=10)
         return entry
 
-    # --- LOGIC & AUTOMATION ---
     async def auto_apply_logic(self, url):
         field_map = {
             "first_name": ["fname", "firstname", "first_name", "given-name"],
@@ -151,22 +149,18 @@ class ResourceHubPro(ctk.CTk):
     def trigger_auto_apply(self, url):
         threading.Thread(target=lambda: asyncio.run(self.auto_apply_logic(url)), daemon=True).start()
 
-    def add_result_row(self, site, query, phone, priority):
+    def add_result_row(self, site, query, priority):
         self.results_count += 1
         self.count_label.configure(text=f"Found: {self.results_count}")
-        self.results_data.append([priority, site['name'], query, phone, site['url']])
-
+        self.results_data.append([priority, site['name'], query, "N/A", site['url']])
         p_color = PRIORITY_COLORS.get(priority, "#808080")
         row = ctk.CTkFrame(self.results_frame, fg_color="#242424", height=70)
         row.pack(fill="x", pady=3, padx=5)
         row.pack_propagate(False)
-
         ctk.CTkLabel(row, text=priority, text_color=p_color, font=("Arial", 11, "bold"), width=100).pack(side="left")
         ctk.CTkLabel(row, text=f"{site['name'].upper()}", justify="left", anchor="w", width=350).pack(side="left", padx=20)
-        
         btn_f = ctk.CTkFrame(row, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
-
         ctk.CTkButton(btn_f, text="Auto-Apply", width=90, fg_color="#3498db", command=lambda u=site['url']: self.trigger_auto_apply(u)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Map", width=70, fg_color="#444", command=lambda u=f"https://www.google.com/maps/search/{quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
 
@@ -187,8 +181,8 @@ class ResourceHubPro(ctk.CTk):
                         await page.goto(site['url'], timeout=12000, wait_until="domcontentloaded")
                         content = await page.evaluate("() => document.body.innerText")
                         if query.lower() in content.lower():
-                            priority = "URGENT" if "deadline" in content.lower() else "NORMAL"
-                            self.after(0, lambda s=site, q=query, pr=priority: self.add_result_row(s, q, "N/A", pr))
+                            pr = "URGENT" if "deadline" in content.lower() else "NORMAL"
+                            self.after(0, lambda s=site, q=query, p=pr: self.add_result_row(s, q, p))
                     except: pass
                     finally:
                         await page.close()
@@ -196,11 +190,15 @@ class ResourceHubPro(ctk.CTk):
             
             await asyncio.gather(*[process_site(s) for s in SITES])
             await browser.close()
+            self.after(0, self.spinner.stop)
+            self.after(0, self.spinner.pack_forget)
             winsound.Beep(1000, 200)
 
     def run_aggregator(self):
         query = self.query_entry.get().strip()
         if not query: return
+        self.spinner.pack(after=self.progress_bar, pady=5)
+        self.spinner.start()
         threading.Thread(target=lambda: asyncio.run(self.scrape_logic(query)), daemon=True).start()
 
     def export_to_csv(self):
