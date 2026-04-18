@@ -98,14 +98,12 @@ class ResourceHubPro(ctk.CTk):
         self.query_entry.delete(0, 'end'); self.query_entry.insert(0, term); self.run_aggregator()
 
     def trigger_auto_apply(self, url):
-        # Dedicated thread for the visual automation window
         def run_thread():
             asyncio.run(self.auto_apply_logic(url))
         threading.Thread(target=run_thread, daemon=True).start()
 
     async def auto_apply_logic(self, url):
         async with async_playwright() as p:
-            # Force headless=False and increase slow_mo for visual confirmation
             browser = await p.chromium.launch(headless=False, slow_mo=100)
             context = await browser.new_context(no_viewport=True)
             page = await context.new_page()
@@ -122,10 +120,17 @@ class ResourceHubPro(ctk.CTk):
                             await el.fill(val)
                             await el.evaluate("el => el.style.border = '2px solid #2ecc71'")
                         except: pass
-                # Leave browser open for user
-                while not page.is_closed(): await asyncio.sleep(1)
+                
+                # Fixed stability loop for browser window
+                while True:
+                    try:
+                        if page.is_closed(): break
+                        await asyncio.sleep(1)
+                    except: break
             except: pass
-            finally: await browser.close()
+            finally: 
+                try: await browser.close()
+                except: pass
 
     def add_result_row(self, site, priority):
         self.results_count += 1
@@ -139,30 +144,38 @@ class ResourceHubPro(ctk.CTk):
         btn_f = ctk.CTkFrame(row, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
 
-        # BUTTONS: Auto-Apply, Visit, Map
+        # Updated Map URL and Auto-Fill buttons
         ctk.CTkButton(btn_f, text="Auto-Fill", width=80, fg_color="#3498db", command=lambda u=site['url']: self.trigger_auto_apply(u)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Visit Site", width=80, fg_color="#34495e", command=lambda u=site['url']: webbrowser.open(u)).pack(side="left", padx=2)
-        ctk.CTkButton(btn_f, text="Map", width=60, fg_color="#444", command=lambda u=f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_f, text="Map", width=60, fg_color="#444", command=lambda u=f"https://www.google.com/maps/search/{quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
 
     async def scrape_logic(self, query):
         self.after(0, lambda: [self.progress_bar.set(0), [w.destroy() for w in self.results_frame.winfo_children()]])
         self.results_count = 0
+        
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(user_agent="Mozilla/5.0 Chrome/122.0.0.0")
             keywords = [query.lower(), "rfp", "funding", "assistance", "expo", "dvr", "shelter"]
-            for site in SITES:
-                page = await context.new_page()
-                try:
-                    await page.goto(site['url'], timeout=30000, wait_until="domcontentloaded")
-                    content = await page.evaluate("() => document.body.innerText")
-                    if any(kw in content.lower() for kw in keywords):
-                        pr = "URGENT" if "deadline" in content.lower() else "NORMAL"
-                        self.after(0, lambda s=site, p=pr: self.add_result_row(s, p))
-                except: pass
-                finally:
-                    await page.close()
-                    self.after(0, lambda: self.progress_bar.set(self.progress_bar.get() + (1/len(SITES))))
+            
+            # Use Semaphore to manage hardware resources (Acer Aspire 14 AI)
+            sem = asyncio.Semaphore(3)
+
+            async def check_site(site):
+                async with sem:
+                    page = await context.new_page()
+                    try:
+                        await page.goto(site['url'], timeout=30000, wait_until="domcontentloaded")
+                        content = await page.evaluate("() => document.body.innerText")
+                        if any(kw in content.lower() for kw in keywords):
+                            pr = "URGENT" if "deadline" in content.lower() else "NORMAL"
+                            self.after(0, lambda s=site, p=pr: self.add_result_row(s, p))
+                    except: pass
+                    finally:
+                        await page.close()
+                        self.after(0, lambda: self.progress_bar.set(self.progress_bar.get() + (1/len(SITES))))
+
+            await asyncio.gather(*[check_site(s) for s in SITES])
             await browser.close()
             self.after(0, lambda: [self.spinner.stop(), self.spinner.pack_forget()])
             winsound.Beep(1000, 200)
