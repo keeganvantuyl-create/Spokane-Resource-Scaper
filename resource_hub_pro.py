@@ -27,7 +27,8 @@ SITES = [
     {"name": "Second Harvest (Food Help)", "url": "https://2-harvest.org/get-help-spokane/", "addr": "1234 E Front Ave, Spokane, WA 99202"},
     {"name": "UGM Spokane (Shelter/Food)", "url": "https://www.uniongospelmission.org/get-help", "addr": "1224 E Trent Ave, Spokane, WA 99202"},
     {"name": "Indeed - Spokane Jobs", "url": "https://www.indeed.com/jobs?l=Spokane%2C+WA", "addr": "Remote/Various"},
-    {"name": "Bold.org Second Chance", "url": "https://bold.org/scholarships/second-chance-scholarship/", "addr": "Remote/Various"}
+    {"name": "Bold.org Second Chance", "url": "https://bold.org/scholarships/second-chance-scholarship/", "addr": "Remote/Various"},
+    {"name": "Spokane Library - Community Resources", "url": "https://www.spokanelibrary.org/community-resources/", "addr": "906 W Main Ave, Spokane, WA 99201"}
 ]
 
 class ResourceHubPro(ctk.CTk):
@@ -121,7 +122,6 @@ class ResourceHubPro(ctk.CTk):
                             await el.evaluate("el => el.style.border = '2px solid #2ecc71'")
                         except: pass
                 
-                # Fixed stability loop for browser window
                 while True:
                     try:
                         if page.is_closed(): break
@@ -144,10 +144,9 @@ class ResourceHubPro(ctk.CTk):
         btn_f = ctk.CTkFrame(row, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
 
-        # Updated Map URL and Auto-Fill buttons
         ctk.CTkButton(btn_f, text="Auto-Fill", width=80, fg_color="#3498db", command=lambda u=site['url']: self.trigger_auto_apply(u)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Visit Site", width=80, fg_color="#34495e", command=lambda u=site['url']: webbrowser.open(u)).pack(side="left", padx=2)
-        ctk.CTkButton(btn_f, text="Map", width=60, fg_color="#444", command=lambda u=f"https://www.google.com/maps/search/{quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_f, text="Map", width=60, fg_color="#444", command=lambda u=f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
 
     async def scrape_logic(self, query):
         self.after(0, lambda: [self.progress_bar.set(0), [w.destroy() for w in self.results_frame.winfo_children()]])
@@ -158,7 +157,6 @@ class ResourceHubPro(ctk.CTk):
             context = await browser.new_context(user_agent="Mozilla/5.0 Chrome/122.0.0.0")
             keywords = [query.lower(), "rfp", "funding", "assistance", "expo", "dvr", "shelter"]
             
-            # Use Semaphore to manage hardware resources (Acer Aspire 14 AI)
             sem = asyncio.Semaphore(3)
 
             async def check_site(site):
