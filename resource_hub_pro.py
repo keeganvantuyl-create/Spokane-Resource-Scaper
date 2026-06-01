@@ -148,8 +148,22 @@ class ResourceHubPro(ctk.CTk):
         ctk.CTkButton(btn_f, text="Visit Site", width=80, fg_color="#34495e", command=lambda u=site['url']: webbrowser.open(u)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Map", width=60, fg_color="#444", command=lambda u=f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
 
+    def _safe_clear_ui(self):
+        self.progress_bar.set(0)
+        for w in self.results_frame.winfo_children():
+            w.destroy()
+
+    def _safe_update_progress(self):
+        current_val = self.progress_bar.get()
+        self.progress_bar.set(current_val + (1 / len(SITES)))
+
+    def _safe_finalize_ui(self):
+        self.spinner.stop()
+        self.spinner.pack_forget()
+        winsound.Beep(1000, 200)
+
     async def scrape_logic(self, query):
-        self.after(0, lambda: [self.progress_bar.set(0), [w.destroy() for w in self.results_frame.winfo_children()]])
+        self.after(0, self._safe_clear_ui)
         self.results_count = 0
         
         async with async_playwright() as p:
@@ -171,12 +185,11 @@ class ResourceHubPro(ctk.CTk):
                     except: pass
                     finally:
                         await page.close()
-                        self.after(0, lambda: self.progress_bar.set(self.progress_bar.get() + (1/len(SITES))))
+                        self.after(0, self._safe_update_progress)
 
             await asyncio.gather(*[check_site(s) for s in SITES])
             await browser.close()
-            self.after(0, lambda: [self.spinner.stop(), self.spinner.pack_forget()])
-            winsound.Beep(1000, 200)
+            self.after(0, self._safe_finalize_ui)
 
     def run_aggregator(self):
         q = self.query_entry.get().strip()
