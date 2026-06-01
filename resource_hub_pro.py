@@ -8,6 +8,7 @@ import webbrowser
 import winsound
 import multiprocessing
 import urllib.request
+import ssl
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 from tkinter import filedialog, messagebox
@@ -165,12 +166,19 @@ class ResourceHubPro(ctk.CTk):
         self.after(0, self._safe_clear_ui)
         self.results_count = 0
         keywords = [query.lower(), "rfp", "funding", "assistance", "expo", "dvr", "shelter"]
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0'}
         
+        # Better fake browser headers
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'}
+        
+        # Bypass expired SSL certificates
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
         for site in SITES:
             try:
                 req = urllib.request.Request(site['url'], headers=headers)
-                with urllib.request.urlopen(req, timeout=10) as response:
+                with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                     content = response.read().decode('utf-8', errors='ignore').lower()
                     
                     if any(kw in content for kw in keywords):
