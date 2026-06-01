@@ -1,5 +1,4 @@
 import customtkinter as ctk
-import asyncio
 import threading
 import json
 import os
@@ -8,13 +7,14 @@ import csv
 import webbrowser
 import winsound
 import multiprocessing
+import urllib.request
 from datetime import datetime
-from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
 from tkinter import filedialog, messagebox
 from urllib.parse import quote
 
 # --- CONFIGURATION ---
-VERSION = "v3.8-Restored-Access"
+VERSION = "v3.9-Stable"
 PROFILE_FILE = "user_profile.json"
 PRIORITY_COLORS = {"URGENT": "#e74c3c", "NORMAL": "#3498db"}
 
@@ -99,38 +99,37 @@ class ResourceHubPro(ctk.CTk):
         self.query_entry.delete(0, 'end'); self.query_entry.insert(0, term); self.run_aggregator()
 
     def trigger_auto_apply(self, url):
-        def run_thread():
-            asyncio.run(self.auto_apply_logic(url))
-        threading.Thread(target=run_thread, daemon=True).start()
+        threading.Thread(target=lambda: self.auto_apply_logic(url), daemon=True).start()
 
-    async def auto_apply_logic(self, url):
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False, slow_mo=100)
-            context = await browser.new_context(no_viewport=True)
-            page = await context.new_page()
-            try:
-                await page.goto(url, wait_until="networkidle", timeout=60000)
-                field_map = {"first_name": ["fname", "first"], "last_name": ["lname", "last"], "email": ["email", "mail"], "phone": ["phone", "tel"]}
-                for key, aliases in field_map.items():
-                    val = self.user_data.get(key)
-                    if val:
-                        selector = ", ".join([f'input[name*="{a}" i], input[id*="{a}" i]' for a in aliases])
-                        try:
-                            el = page.locator(selector).first
-                            await el.wait_for(state="visible", timeout=5000)
-                            await el.fill(val)
-                            await el.evaluate("el => el.style.border = '2px solid #2ecc71'")
-                        except: pass
-                
-                while True:
-                    try:
-                        if page.is_closed(): break
-                        await asyncio.sleep(1)
-                    except: break
-            except: pass
-            finally: 
-                try: await browser.close()
-                except: pass
+    def auto_apply_logic(self, url):
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=False, slow_mo=100)
+                context = browser.new_context(no_viewport=True)
+                page = context.new_page()
+                try:
+                    page.goto(url, wait_until="networkidle", timeout=30000)
+                    field_map = {"first_name": ["fname", "first"], "last_name": ["lname", "last"], "email": ["email", "mail"], "phone": ["phone", "tel"]}
+                    for key, aliases in field_map.items():
+                        val = self.user_data.get(key)
+                        if val:
+                            selector = ", ".join([f'input[name*="{a}" i], input[id*="{a}" i]' for a in aliases])
+                            try:
+                                el = page.locator(selector).first
+                                el.wait_for(state="visible", timeout=3000)
+                                el.fill(val)
+                                el.evaluate("el => el.style.border = '2px solid #2ecc71'")
+                            except: pass
+                    
+                    while not page.is_closed():
+                        page.wait_for_timeout(1000)
+                except Exception as e:
+                    print(f"Auto-fill navigation window closed or failed: {e}")
+                finally:
+                    try: browser.close()
+                    except: pass
+        except Exception as p_err:
+            self.after(0, lambda: messagebox.showerror("Playwright Error", "Make sure you ran 'playwright install' in your terminal."))
 
     def add_result_row(self, site, priority):
         self.results_count += 1
@@ -146,7 +145,7 @@ class ResourceHubPro(ctk.CTk):
 
         ctk.CTkButton(btn_f, text="Auto-Fill", width=80, fg_color="#3498db", command=lambda u=site['url']: self.trigger_auto_apply(u)).pack(side="left", padx=2)
         ctk.CTkButton(btn_f, text="Visit Site", width=80, fg_color="#34495e", command=lambda u=site['url']: webbrowser.open(u)).pack(side="left", padx=2)
-        ctk.CTkButton(btn_f, text="Map", width=60, fg_color="#444", command=lambda u=f"https://www.google.com/maps/search/?api=1&query={quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_f, text="Map", width=60, fg_color="#444", command=lambda u=f"https://maps.google.com/?q={quote(site['addr'])}": webbrowser.open(u)).pack(side="left", padx=2)
 
     def _safe_clear_ui(self):
         self.progress_bar.set(0)
@@ -162,40 +161,33 @@ class ResourceHubPro(ctk.CTk):
         self.spinner.pack_forget()
         winsound.Beep(1000, 200)
 
-    async def scrape_logic(self, query):
+    def scrape_logic(self, query):
         self.after(0, self._safe_clear_ui)
         self.results_count = 0
+        keywords = [query.lower(), "rfp", "funding", "assistance", "expo", "dvr", "shelter"]
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0'}
         
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(user_agent="Mozilla/5.0 Chrome/122.0.0.0")
-            keywords = [query.lower(), "rfp", "funding", "assistance", "expo", "dvr", "shelter"]
-            
-            sem = asyncio.Semaphore(3)
-
-            async def check_site(site):
-                async with sem:
-                    page = await context.new_page()
-                    try:
-                        await page.goto(site['url'], timeout=30000, wait_until="domcontentloaded")
-                        content = await page.evaluate("() => document.body.innerText")
-                        if any(kw in content.lower() for kw in keywords):
-                            pr = "URGENT" if "deadline" in content.lower() else "NORMAL"
-                            self.after(0, lambda s=site, p=pr: self.add_result_row(s, p))
-                    except: pass
-                    finally:
-                        await page.close()
-                        self.after(0, self._safe_update_progress)
-
-            await asyncio.gather(*[check_site(s) for s in SITES])
-            await browser.close()
-            self.after(0, self._safe_finalize_ui)
+        for site in SITES:
+            try:
+                req = urllib.request.Request(site['url'], headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    content = response.read().decode('utf-8', errors='ignore').lower()
+                    
+                    if any(kw in content for kw in keywords):
+                        pr = "URGENT" if "deadline" in content else "NORMAL"
+                        self.after(0, lambda s=site, p=pr: self.add_result_row(s, p))
+            except Exception as e:
+                print(f"Skipping {site['name']}: {e}")
+            finally:
+                self.after(0, self._safe_update_progress)
+                    
+        self.after(0, self._safe_finalize_ui)
 
     def run_aggregator(self):
         q = self.query_entry.get().strip()
         if q:
             self.spinner.pack(after=self.progress_bar, pady=5); self.spinner.start()
-            threading.Thread(target=lambda: asyncio.run(self.scrape_logic(q)), daemon=True).start()
+            threading.Thread(target=lambda: self.scrape_logic(q), daemon=True).start()
 
     def setup_profile_tab(self):
         tab = self.tabview.tab("My Profile")
